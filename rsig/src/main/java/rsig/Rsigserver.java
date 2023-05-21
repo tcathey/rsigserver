@@ -1,4 +1,4 @@
-i/*
+/*
 Rsigserver.java - Servlet that forwards HTTP requests to an internal server.
 javac rsigserver.java -classpath /usr/share/java/servlet.jar
 2007-10-19 plessel.todd@epa.gov, 1-919-541-5500.
