@@ -1,4 +1,4 @@
-/*
+i/*
 Rsigserver.java - Servlet that forwards HTTP requests to an internal server.
 javac rsigserver.java -classpath /usr/share/java/servlet.jar
 2007-10-19 plessel.todd@epa.gov, 1-919-541-5500.
@@ -23,6 +23,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.security.KeyStoreException;
 import java.security.cert.CertificateException;
+import java.util.List;
+import java.util.Map;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.KeyManagementException;
@@ -64,49 +66,37 @@ public class Rsigserver extends HttpServlet {
 				final String queryString = request.getQueryString(); // Part after '?'.
 				final String command = targetURL + queryString; // Forward query.
 
-				// final URL url = new URL(command);
+				// specify the protocol handler to prevent WebLogic from using the SOAP handler!
 				final URL url = new URL(null, command, new sun.net.www.protocol.https.Handler());
-				boolean done = false;
 
 				// Forward the entire header:
-
-				final HttpsURLConnection connection = (HttpsURLConnection)url.openConnection(); // Read header.
+				final HttpsURLConnection connection = (HttpsURLConnection) url.openConnection(); // Read header.
 				connection.setSSLSocketFactory(sslSF);
-				int index = 0; // On each header line.
 
-				do {
-					final String key = connection.getHeaderFieldKey(index);
-
-					if (key == null) {
-						done = true;
-					} else {
-						final String value = connection.getHeaderField(index);
-						response.setHeader(key, value);
-						++index;
-					}
-
-				} while (!done);
+				// Transfer headers to response in a reliable way:
+				Map<String, List<String>> headerFields = connection.getHeaderFields();
+				for (Map.Entry<String, List<String>> entry : headerFields.entrySet()) {
+				    String key = entry.getKey();
+				    if (key != null) {
+				        List<String> values = entry.getValue();
+				        for (String value : values) {
+				            response.setHeader(key, value);
+				        }
+				    }
+				}
 
 				// Forward the entire content:
-
-				done = false;
-				input = connection.getInputStream();
-				output = response.getOutputStream();
+				input = connection.getInputStream(); // Read from internal server.
+				output = response.getOutputStream(); // Write to response.
 				final byte[] buffer = new byte[1024 * 1024]; // To hold content.
 
-				do {
-					final int byteCount = input.read(buffer);
-
-					if (byteCount == -1) {
-						done = true;
-					} else {
-						output.write(buffer, 0, byteCount);
-						output.flush();
-					}
-
-				} while (!done);
-			}
-
+				// a more idiomatic way of reading and writing data from the input stream to the output stream:
+				int byteCount;
+				while ((byteCount = input.read(buffer)) != -1) {
+				    output.write(buffer, 0, byteCount);
+				    output.flush();
+				}
+			}	
 			finally { // Always close input and output streams:
 
 				if (input != null) {
@@ -131,4 +121,3 @@ public class Rsigserver extends HttpServlet {
 	}
 
 };
-
